@@ -11,4 +11,4 @@ number of workers and buffered task can be changed dynamically
 
 this will be implemented in TaskManager() 
 
-
+thread_pool_destroy
