@@ -172,7 +172,6 @@ void AddTask(thread_pool *pool, void*(func)(void*), void *arg)
     ready_args->arg = arg;
 
     pthread_mutex_lock(&pool->mutex_list_ready_args); // put the task into ready list
-    int need_signal = (pool->list_ready_args == NULL);
     ready_args->next = pool->list_ready_args;
     pool->list_ready_args = ready_args;
     pthread_cond_broadcast(&pool->cond_ReadyArgsReleased);
