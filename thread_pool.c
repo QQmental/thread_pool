@@ -138,24 +138,21 @@ void* TaskWorker(void *PoolArg)
 
         thread_args *ready_args = pool->list_ready_args; // remove a thread_args from 'pool->list_ready_args'
         pool->list_ready_args = pool->list_ready_args->next;
-
+        pthread_mutex_unlock(&pool->mutex_list_ready_args);
+  
         pthread_mutex_lock(&pool->mutex_CurrentWorkingCount); // increase CurrentWorkingCount
         pool->CurrentWorkingCount += 1;
         pthread_mutex_unlock(&pool->mutex_CurrentWorkingCount);
-        pthread_mutex_unlock(&pool->mutex_list_ready_args);
-  
         
         ready_args->ret = ready_args->task(ready_args->arg); // start working
-
-        
-        pthread_mutex_lock(&pool->mutex_list_idle_args); // recycle unused thread args
-        ready_args->next = pool->list_idle_args;
-        pool->list_idle_args = ready_args;
 
         pthread_mutex_lock(&pool->mutex_CurrentWorkingCount); // decrease CurrentWorkingCount
         pool->CurrentWorkingCount -= 1;
         pthread_mutex_unlock(&pool->mutex_CurrentWorkingCount);
-
+        
+        pthread_mutex_lock(&pool->mutex_list_idle_args); // recycle unused thread args
+        ready_args->next = pool->list_idle_args;
+        pool->list_idle_args = ready_args;
         pthread_cond_broadcast(&pool->cond_IdleArgsExist);
         pthread_mutex_unlock(&pool->mutex_list_idle_args);
     }
@@ -164,17 +161,17 @@ void* TaskWorker(void *PoolArg)
 
 void AddTask(thread_pool *pool, void*(func)(void*), void *arg)
 {
-    pthread_mutex_lock(&pool->mutex_list_idle_args); 
+    pthread_mutex_lock(&pool->mutex_list_idle_args); // trying to take an idle resourse 
     while(pool->list_idle_args == NULL)
         pthread_cond_wait(&pool->cond_IdleArgsExist, &pool->mutex_list_idle_args);      
     thread_args *ready_args = pool->list_idle_args;
     pool->list_idle_args = pool->list_idle_args->next;
     pthread_mutex_unlock(&pool->mutex_list_idle_args);
 
-    ready_args->task = func;
+    ready_args->task = func;                        // initialize task args
     ready_args->arg = arg;
 
-    pthread_mutex_lock(&pool->mutex_list_ready_args);
+    pthread_mutex_lock(&pool->mutex_list_ready_args); // put the task into ready list
     int need_signal = (pool->list_ready_args == NULL);
     ready_args->next = pool->list_ready_args;
     pool->list_ready_args = ready_args;
